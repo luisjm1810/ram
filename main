@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Borrego Optimizer Pro — Análisis ejecutivo de rentabilidad para engorda ovina">
+<title>Borrego Optimizer Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0a0d0b;
+  --surface:  #111510;
+  --card:     #161c14;
+  --border:   #1e2b1a;
+  --border2:  #2a3a25;
+  --green:    #4cff7e;
+  --green2:   #2adb5a;
+  --green-d:  #0d3320;
+  --green-m:  rgba(76,255,126,0.08);
+  --amber:    #f5c842;
+  --red:      #ff5a5a;
+  --text:     #e8f0e4;
+  --text-mid: #7a9470;
+  --text-dim: #3d5438;
+  --mono:     'IBM Plex Mono', monospace;
+  --sans:     'Syne', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: 15px;
+  scroll-behavior: smooth;
+  background: var(--bg);
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+/* ── HERO ── */
+.hero {
+  position: relative;
+  padding: clamp(48px, 10vw, 96px) clamp(20px, 5vw, 64px) clamp(32px, 6vw, 64px);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background: radial-gradient(ellipse 80% 60% at 70% -10%, rgba(76,255,126,0.06) 0%, transparent 70%);
+}
+.hero-grid {
+  position: absolute; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.35;
+  mask-image: radial-gradient(ellipse 100% 100% at 100% 0%, black 0%, transparent 60%);
+}
+.hero-inner { position: relative; z-index: 1; max-width: 960px; }
+.hero-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; font-weight: 300;
+  color: var(--green); letter-spacing: 0.1em;
+  border: 1px solid rgba(76,255,126,0.25);
+  padding: 5px 12px; margin-bottom: 24px;
+}
+.hero-tag::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+.hero-title {
+  font-size: clamp(36px, 8vw, 80px);
+  font-weight: 800;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+}
+.hero-title .accent { color: var(--green); }
+.hero-sub {
+  font-family: var(--mono); font-weight: 300;
+  font-size: clamp(12px, 2vw, 14px);
+  color: var(--text-mid);
+  line-height: 1.8;
+  max-width: 600px;
+  margin-bottom: 40px;
+}
+.hero-stats {
+  display: flex; flex-wrap: wrap; gap: 0;
+  border: 1px solid var(--border2);
+}
+.hs {
+  flex: 1; min-width: 120px;
+  padding: 16px 20px;
+  border-right: 1px solid var(--border2);
+}
+.hs:last-child { border-right: none; }
+.hs-lbl {
+  font-family: var(--mono); font-size: 9px; font-weight: 300;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--text-dim); display: block; margin-bottom: 6px;
+}
+.hs-val {
+  font-size: clamp(18px, 4vw, 26px); font-weight: 700;
+  color: var(--text); letter-spacing: -0.02em;
+}
+.hs-val .unit { font-size: 0.55em; color: var(--text-mid); margin-left: 2px; }
+
+/* ── NAV PILLS ── */
+.nav-wrap {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,13,11,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav-wrap::-webkit-scrollbar { display: none; }
+.nav-inner {
+  display: flex; gap: 0;
+  padding: 0 clamp(16px, 4vw, 48px);
+  white-space: nowrap;
+}
+.nav-pill {
+  font-family: var(--mono); font-size: 11px; font-weight: 400;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-dim); padding: 14px 18px;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+  text-decoration: none; display: block; white-space: nowrap;
+}
+.nav-pill:hover { color: var(--text-mid); }
+.nav-pill.on { color: var(--green); border-bottom-color: var(--green); }
+
+/* ── LAYOUT ── */
+.page { max-width: 1280px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 48px) 80px; position: relative; z-index: 1; }
+
+section { padding-top: clamp(48px, 8vw, 80px); }
+
+.sec-head {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: clamp(24px, 4vw, 40px);
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.sec-num {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--green); opacity: 0.7;
+}
+.sec-title {
+  font-size: clamp(18px, 4vw, 26px); font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.sec-note {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ── CARDS ── */
+.g1 { margin-bottom: 16px; }
+.g2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: 16px; margin-bottom: 16px;
+}
+.g3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 16px; margin-bottom: 16px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  position: relative; overflow: hidden;
+  transition: border-color 0.25s;
+}
+.card:hover { border-color: var(--border2); }
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--green) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.card:hover::before { opacity: 1; }
+.card-head {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+}
+.card-title {
+  font-size: clamp(13px, 2.5vw, 15px); font-weight: 600;
+  letter-spacing: -0.01em; line-height: 1.3;
+}
+.card-meta {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--text-dim); white-space: nowrap;
+}
+.card-body { padding: 12px 4px 4px; }
+
+/* ── KPI CARDS ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  gap: 12px; margin-bottom: 32px;
+}
+.kpi {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: clamp(16px, 3vw, 24px);
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s;
+}
+.kpi:hover { border-color: var(--border2); }
+.kpi.star {
+  background: var(--green-d);
+  border-color: rgba(76,255,126,0.3);
+}
+.kpi.star .kpi-v { color: var(--green); }
+.kpi-l {
+  font-family: var(--mono); font-size: 9px; font-weight: 300;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-dim); display: block; margin-bottom: 12px;
+}
+.kpi.star .kpi-l { color: rgba(76,255,126,0.5); }
+.kpi-v {
+  font-size: clamp(26px, 6vw, 38px); font-weight: 800;
+  letter-spacing: -0.03em; line-height: 1; color: var(--text);
+}
+.kpi-u { font-size: 0.5em; color: var(--text-mid); margin-left: 2px; font-weight: 400; }
+.kpi-s {
+  display: block; margin-top: 8px;
+  font-family: var(--mono); font-size: 10px;
+  color: var(--text-dim); line-height: 1.5;
+}
+.kpi.star .kpi-s { color: rgba(76,255,126,0.45); }
+
+/* ── TABLE ── */
+.tbl-wrap {
+  background: var(--card); border: 1px solid var(--border);
+  overflow-x: auto; margin-bottom: 16px;
+}
+.tbl-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  flex-wrap: wrap;
+}
+.tbl-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.badge {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--green);
+  border: 1px solid rgba(76,255,126,0.25);
+  padding: 3px 10px; white-space: nowrap;
+}
+table { width: 100%; border-collapse: collapse; font-size: clamp(12px, 2vw, 13px); }
+thead tr { background: rgba(255,255,255,0.02); }
+thead th {
+  padding: 10px 20px;
+  font-family: var(--mono); font-size: 9px; font-weight: 400;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--text-dim); border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+thead th:not(:first-child) { text-align: right; }
+tbody tr { border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.15s; }
+tbody tr:hover { background: rgba(76,255,126,0.03); }
+tbody tr.opt { background: var(--green-m) !important; }
+tbody td { padding: 12px 20px; font-family: var(--mono); font-size: 12px; color: var(--text-mid); }
+tbody td:not(:first-child) { text-align: right; }
+.td-hi { color: var(--green) !important; font-weight: 400; }
+.opt-tag {
+  display: inline-block; font-size: 8px; letter-spacing: 0.12em;
+  text-transform: uppercase; background: var(--green); color: var(--bg);
+  padding: 1px 6px; margin-left: 8px; font-weight: 600;
+  vertical-align: middle; position: relative; top: -1px;
+}
+
+/* ── CLOSING ── */
+.closing {
+  background: var(--card); border: 1px solid var(--border);
+  border-top: 2px solid var(--green);
+  padding: clamp(28px, 6vw, 56px) clamp(20px, 5vw, 48px);
+  margin-top: 64px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: clamp(32px, 5vw, 56px);
+}
+.cl-label {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--green); opacity: 0.6;
+  display: block; margin-bottom: 14px;
+}
+.cl-title {
+  font-size: clamp(20px, 4vw, 28px); font-weight: 700;
+  letter-spacing: -0.02em; line-height: 1.25; margin-bottom: 16px;
+}
+.cl-body {
+  font-family: var(--mono); font-size: 12px; font-weight: 300;
+  color: var(--text-mid); line-height: 1.9;
+}
+.cl-stat { padding-top: 24px; border-top: 1px solid var(--border); }
+.cl-stat + .cl-stat { margin-top: 20px; }
+.cl-stat-l {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-dim); display: block; margin-bottom: 6px;
+}
+.cl-stat-v {
+  font-size: clamp(22px, 5vw, 32px); font-weight: 700;
+  letter-spacing: -0.02em; color: var(--text);
+}
+.cl-stat-n {
+  display: block; font-family: var(--mono); font-size: 10px;
+  color: var(--text-dim); margin-top: 4px;
+}
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 20px clamp(16px, 4vw, 48px);
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 8px;
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  position: relative; z-index: 1;
+}
+footer a { color: var(--green); text-decoration: none; opacity: 0.7; }
+
+/* ── ANIMATE ── */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+/* ── PLOTLY OVERRIDES ── */
+.js-plotly-plot .plotly .modebar { display: none !important; }
+
+/* ── MOBILE TWEAKS ── */
+@media (max-width: 480px) {
+  .hs { min-width: 50%; }
+  .sec-note { display: none; }
+  .hero-stats { flex-direction: row; flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="hero-tag">Sistema activo — v2.0 estable</div>
+    <h1 class="hero-title">Borrego<br>Optimizer <span class="accent">Pro</span></h1>
+    <p class="hero-sub">
+      Análisis de rentabilidad para engorda ovina.<br>
+      Simulación estocástica · 300 animales · 45,000 registros · semilla 42
+    </p>
+    <div class="hero-stats">
+      <div class="hs">
+        <span class="hs-lbl">Animales</span>
+        <div class="hs-val">300</div>
+      </div>
+      <div class="hs">
+        <span class="hs-lbl">Registros</span>
+        <div class="hs-val">45K</div>
+      </div>
+      <div class="hs">
+        <span class="hs-lbl">Razas</span>
+        <div class="hs-val">5</div>
+      </div>
+      <div class="hs">
+        <span class="hs-lbl">Peso óptimo</span>
+        <div class="hs-val">45<span class="unit">kg</span></div>
+      </div>
+      <div class="hs">
+        <span class="hs-lbl">ROI máximo</span>
+        <div class="hs-val">218<span class="unit">%</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav class="nav-wrap">
+  <div class="nav-inner">
+    <a href="#s-kpis"    class="nav-pill on">KPIs</a>
+    <a href="#s-rent"    class="nav-pill">Rentabilidad</a>
+    <a href="#s-peso"    class="nav-pill">Evolución peso</a>
+    <a href="#s-conv"    class="nav-pill">Conversión</a>
+    <a href="#s-costos"  class="nav-pill">Costos</a>
+    <a href="#s-razas"   class="nav-pill">Razas</a>
+    <a href="#s-tabla"   class="nav-pill">Tabla</a>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- 01 KPIs -->
+  <section id="s-kpis">
+    <div class="sec-head reveal">
+      <span class="sec-num">01</span>
+      <h2 class="sec-title">Métricas Clave</h2>
+      <span class="sec-note">Punto óptimo: 45 kg</span>
+    </div>
+    <div class="kpi-grid reveal">
+      <div class="kpi star">
+        <span class="kpi-l">Peso óptimo</span>
+        <div class="kpi-v">45<span class="kpi-u">kg</span></div>
+        <span class="kpi-s">Mayor eficiencia económica</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-l">Utilidad por animal</span>
+        <div class="kpi-v">$1,563</div>
+        <span class="kpi-s">En punto óptimo</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-l">ROI</span>
+        <div class="kpi-v">218<span class="kpi-u">%</span></div>
+        <span class="kpi-s">Retorno sobre costo</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-l">Días de engorda</span>
+        <div class="kpi-v">68<span class="kpi-u">días</span></div>
+        <span class="kpi-s">Para alcanzar 45 kg</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-l">Utilidad / día</span>
+        <div class="kpi-v">$22<span class="kpi-u">.79</span></div>
+        <span class="kpi-s">Eficiencia temporal</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-l">Conversión</span>
+        <div class="kpi-v">5.88</div>
+        <span class="kpi-s">kg MS / kg ganancia</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 RENTABILIDAD -->
+  <section id="s-rent">
+    <div class="sec-head reveal">
+      <span class="sec-num">02</span>
+      <h2 class="sec-title">Rentabilidad por Peso de Sacrificio</h2>
+      <span class="sec-note">45–65 kg</span>
+    </div>
+    <div class="g2">
+      <div class="card reveal">
+        <div class="card-head">
+          <span class="card-title">ROI por peso objetivo</span>
+          <span class="card-meta">Retorno %</span>
+        </div>
+        <div class="card-body"><div id="ch-roi"></div></div>
+      </div>
+      <div class="card reveal">
+        <div class="card-head">
+          <span class="card-title">Utilidad generada por día</span>
+          <span class="card-meta">$/día por animal</span>
+        </div>
+        <div class="card-body"><div id="ch-ud"></div></div>
+      </div>
+    </div>
+    <div class="card g1 reveal">
+      <div class="card-head">
+        <span class="card-title">Utilidad total vs. días de engorda</span>
+        <span class="card-meta">Por peso objetivo</span>
+      </div>
+      <div class="card-body"><div id="ch-scatter"></div></div>
+    </div>
+  </section>
+
+  <!-- 03 EVOLUCIÓN PESO -->
+  <section id="s-peso">
+    <div class="sec-head reveal">
+      <span class="sec-num">03</span>
+      <h2 class="sec-title">Evolución del Peso Promedio</h2>
+      <span class="sec-note">300 animales · 150 días</span>
+    </div>
+    <div class="card g1 reveal">
+      <div class="card-head">
+        <span class="card-title">Curva de crecimiento — promedio poblacional</span>
+        <span class="card-meta">kg / día</span>
+      </div>
+      <div class="card-body"><div id="ch-evo"></div></div>
+    </div>
+  </section>
+
+  <!-- 04 CONVERSIÓN -->
+  <section id="s-conv">
+    <div class="sec-head reveal">
+      <span class="sec-num">04</span>
+      <h2 class="sec-title">Conversión Alimenticia</h2>
+      <span class="sec-note">Eficiencia de transformación</span>
+    </div>
+    <div class="g2">
+      <div class="card reveal">
+        <div class="card-head">
+          <span class="card-title">Conversión por peso de sacrificio</span>
+          <span class="card-meta">kg MS / kg ganancia</span>
+        </div>
+        <div class="card-body"><div id="ch-conv"></div></div>
+      </div>
+      <div class="card reveal">
+        <div class="card-head">
+          <span class="card-title">GDP por fase de engorda</span>
+          <span class="card-meta">Ganancia diaria promedio</span>
+        </div>
+        <div class="card-body"><div id="ch-gdp-fase"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 COSTOS -->
+  <section id="s-costos">
+    <div class="sec-head reveal">
+      <span class="sec-num">05</span>
+      <h2 class="sec-title">Costos vs. Valor de Venta</h2>
+      <span class="sec-note">MXN por animal</span>
+    </div>
+    <div class="card g1 reveal">
+      <div class="card-head">
+        <span class="card-title">Costo acumulado vs. valor de venta</span>
+        <span class="card-meta">Por peso de sacrificio</span>
+      </div>
+      <div class="card-body"><div id="ch-costo"></div></div>
+    </div>
+    <div class="card g1 reveal">
+      <div class="card-head">
+        <span class="card-title">GDP promedio por tipo de alimento</span>
+        <span class="card-meta">4 dietas evaluadas</span>
+      </div>
+      <div class="card-body"><div id="ch-alimento"></div></div>
+    </div>
+  </section>
+
+  <!-- 06 RAZAS -->
+  <section id="s-razas">
+    <div class="sec-head reveal">
+      <span class="sec-num">06</span>
+      <h2 class="sec-title">Desempeño por Raza</h2>
+      <span class="sec-note">5 razas evaluadas</span>
+    </div>
+    <div class="g2">
+      <div class="card reveal">
+        <div class="card-head">
+          <span class="card-title">GDP promedio por raza</span>
+          <span class="card-meta">g/día</span>
+        </div>
+        <div class="card-body"><div id="ch-raza"></div></div>
+      </div>
+      <div class="card reveal">
+        <div class="card-head">
+          <span class="card-title">Distribución peso inicial por raza</span>
+          <span class="card-meta">Densidad normal</span>
+        </div>
+        <div class="card-body"><div id="ch-dist"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 TABLA -->
+  <section id="s-tabla">
+    <div class="sec-head reveal">
+      <span class="sec-num">07</span>
+      <h2 class="sec-title">Resultados Detallados</h2>
+      <span class="sec-note">Todos los escenarios</span>
+    </div>
+    <div class="tbl-wrap reveal">
+      <div class="tbl-head">
+        <span class="tbl-title">Indicadores por peso objetivo de sacrificio</span>
+        <span class="badge">Óptimo resaltado</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Peso</th>
+            <th>Días</th>
+            <th>Conv.</th>
+            <th>Costo</th>
+            <th>Valor</th>
+            <th>Utilidad</th>
+            <th>ROI</th>
+            <th>$/día</th>
+          </tr>
+        </thead>
+        <tbody id="tbl"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CLOSING -->
+  <div class="closing reveal">
+    <div>
+      <span class="cl-label">Conclusión del análisis</span>
+      <h2 class="cl-title">El peso óptimo de sacrificio se sitúa en 45 kg</h2>
+      <p class="cl-body">
+        El modelo identifica 45 kg como el punto donde la utilidad diaria
+        generada por animal es máxima ($22.79/día). A partir de este umbral,
+        el costo marginal de continuar la engorda supera el beneficio
+        incremental en valor de venta.<br><br>
+        Razas recomendadas: Suffolk y Dorper. Dieta óptima: Concentrado
+        Premium 18%. Horizonte de sacrificio: 68–70 días.
+      </p>
+    </div>
+    <div>
+      <div class="cl-stat">
+        <span class="cl-stat-l">ROI en punto óptimo</span>
+        <div class="cl-stat-v">218.2%</div>
+        <span class="cl-stat-n">Retorno sobre costo total acumulado</span>
+      </div>
+      <div class="cl-stat">
+        <span class="cl-stat-l">Conversión óptima</span>
+        <div class="cl-stat-v">5.88</div>
+        <span class="cl-stat-n">kg de alimento por kg de ganancia</span>
+      </div>
+    </div>
+    <div>
+      <div class="cl-stat">
+        <span class="cl-stat-l">Costo total estimado</span>
+        <div class="cl-stat-v">$716</div>
+        <span class="cl-stat-n">Por animal al peso objetivo</span>
+      </div>
+      <div class="cl-stat">
+        <span class="cl-stat-l">Valor de venta estimado</span>
+        <div class="cl-stat-v">$2,279</div>
+        <span class="cl-stat-n">Por animal en mercado actual</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<footer>
+  <div>Borrego Optimizer Pro — <strong style="color:var(--text-mid)">v2.0</strong></div>
+  <div id="ftr-date"></div>
+  <div><a href="https://github.com" target="_blank">GitHub Pages</a></div>
+</footer>
+
+<script>
+// ─────────────────────────────────────────────────
+// DATA (semilla 42 — dataset real 45,000 registros)
+// ─────────────────────────────────────────────────
+const RS = [
+  { p:45, d:68.6,  c:5.88,  costo:716,  v:2279, u:1563, r:218.2, ud:22.79 },
+  { p:50, d:85.0,  c:6.55,  costo:935,  v:2633, u:1698, r:181.7, ud:19.98 },
+  { p:55, d:101.7, c:8.00,  costo:1175, v:2897, u:1721, r:146.5, ud:16.92 },
+  { p:60, d:116.7, c:8.82,  costo:1444, v:3096, u:1653, r:114.5, ud:14.16 },
+  { p:65, d:128.1, c:10.73, costo:1720, v:3356, u:1636, r:95.1,  ud:12.77 },
+];
+const OPT = RS.reduce((a,b) => a.ud > b.ud ? a : b);
+const LBL = RS.map(r => r.p + ' kg');
+
+const EVO = [
+  [1,24.4],[5,25.6],[10,27.1],[15,28.5],[20,30.0],[25,31.5],[30,32.9],
+  [35,34.6],[40,36.2],[45,37.9],[50,39.5],[55,41.1],[60,42.7],[65,44.3],
+  [68,45.3],[70,45.9],[75,47.5],[80,49.1],[85,50.6],[90,52.2],[95,53.7],
+  [100,55.1],[105,56.6],[110,58.0],[115,59.4],[120,60.8],[125,62.1],
+  [130,63.3],[135,64.5],[140,65.7],[145,66.9],[150,68.0]
+];
+
+const FASES = {
+  '0–30 d':0.2949, '31–90 d':0.3201, '91–120 d':0.2871, '121–150 d':0.2389
+};
+const ALIMENTO = {
+  'Premium 18%':0.3260, 'Integral':0.2951, 'Estándar 16%':0.2883, 'Pastura':0.2604
+};
+const RAZA = {
+  'Suffolk':0.3104, 'Dorper':0.3035, 'Katahdin':0.2906, 'Hampshire':0.2830, 'Pelibuey':0.2712
+};
+const DIST = {
+  Dorper:    {m:24.50, s:2.65},
+  Hampshire: {m:24.41, s:2.45},
+  Katahdin:  {m:24.42, s:2.67},
+  Pelibuey:  {m:24.60, s:2.34},
+  Suffolk:   {m:24.23, s:2.41},
+};
+
+// ─────────────────────────────────────────────────
+// PLOTLY CONFIG
+// ─────────────────────────────────────────────────
+const BG   = '#161c14';
+const GC   = 'rgba(255,255,255,0.04)';
+const FONT = { family:"'IBM Plex Mono', monospace", size:10, color:'#7a9470' };
+const M    = { l:48, r:12, t:10, b:48 };
+const Mh   = { l:48, r:12, t:10, b:72 };
+const cfg  = { displayModeBar:false, responsive:true };
+const base = {
+  font:FONT, paper_bgcolor:BG, plot_bgcolor:BG, margin:M, showlegend:false,
+  xaxis:{ gridcolor:GC, linecolor:'rgba(255,255,255,0.06)', zeroline:false, tickfont:FONT },
+  yaxis:{ gridcolor:GC, linecolor:'rgba(255,255,255,0.06)', zeroline:false, tickfont:FONT }
+};
+
+const G = '#4cff7e', Gd = 'rgba(76,255,126,0.25)', Gm = 'rgba(76,255,126,0.10)';
+const GR = 'rgba(255,90,90,0.8)';
+
+function barC(arr, hi=true) {
+  const ext = hi ? Math.max(...arr) : Math.min(...arr);
+  return arr.map(v => v === ext ? G : Gd);
+}
+function nPDF(x, m, s) {
+  return Math.exp(-0.5*((x-m)/s)**2) / (s*Math.sqrt(2*Math.PI));
+}
+const fmt = (n,d=0) => n.toLocaleString('es-MX',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+// ─────────────────────────────────────────────────
+// TABLE
+// ─────────────────────────────────────────────────
+const tbody = document.getElementById('tbl');
+RS.forEach(r => {
+  const o = r.p === OPT.p;
+  tbody.innerHTML += `<tr class="${o?'opt':''}">
+    <td class="${o?'td-hi':''}">${r.p} kg${o?'<span class="opt-tag">óptimo</span>':''}</td>
+    <td>${r.d}</td><td>${r.c}</td>
+    <td>$${fmt(r.costo)}</td><td>$${fmt(r.v)}</td>
+    <td class="${o?'td-hi':''}">$${fmt(r.u)}</td>
+    <td class="${o?'td-hi':''}">${r.r}%</td>
+    <td class="${o?'td-hi':''}">$${r.ud}</td>
+  </tr>`;
+});
+
+// ─────────────────────────────────────────────────
+// FOOTER DATE
+// ─────────────────────────────────────────────────
+document.getElementById('ftr-date').textContent =
+  new Date().toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'});
+
+// ─────────────────────────────────────────────────
+// CHARTS
+// ─────────────────────────────────────────────────
+
+// ROI
+Plotly.newPlot('ch-roi',[{
+  x:LBL, y:RS.map(r=>r.r), type:'bar',
+  marker:{color:barC(RS.map(r=>r.r)), line:{width:0}},
+  text:RS.map(r=>r.r+'%'), textposition:'outside', textfont:{size:10, color:'#7a9470'},
+  hovertemplate:'%{x}<br>ROI: %{y:.1f}%<extra></extra>'
+}],{...base, yaxis:{...base.yaxis, ticksuffix:'%'}, bargap:0.35},cfg);
+
+// Utilidad / día
+Plotly.newPlot('ch-ud',[{
+  x:LBL, y:RS.map(r=>r.ud), type:'bar',
+  marker:{color:barC(RS.map(r=>r.ud)), line:{width:0}},
+  text:RS.map(r=>'$'+r.ud), textposition:'outside', textfont:{size:10, color:'#7a9470'},
+  hovertemplate:'%{x}<br>$%{y:.2f}/día<extra></extra>'
+}],{...base, yaxis:{...base.yaxis, tickprefix:'$'}, bargap:0.35},cfg);
+
+// Scatter
+Plotly.newPlot('ch-scatter',[{
+  x:RS.map(r=>r.d), y:RS.map(r=>r.u),
+  mode:'lines+markers', type:'scatter',
+  line:{color:G, width:1.5},
+  marker:{
+    size:RS.map(r=>r.p===OPT.p?14:8),
+    color:RS.map(r=>r.p===OPT.p?G:Gd),
+    line:{color:'rgba(0,0,0,0.5)', width:1}
+  },
+  text:RS.map(r=>r.p+' kg'),
+  hovertemplate:'<b>%{text}</b><br>Días: %{x:.0f}<br>Utilidad: $%{y:,}<extra></extra>'
+}],{
+  ...base, margin:{l:56,r:12,t:10,b:48},
+  xaxis:{...base.xaxis, title:{text:'Días de engorda', standoff:8}},
+  yaxis:{...base.yaxis, title:{text:'Utilidad ($)', standoff:8}, tickprefix:'$'}
+},cfg);
+
+// Evolución peso
+const optDay = EVO.find(p=>p[0]>=Math.round(OPT.d));
+Plotly.newPlot('ch-evo',[
+  {
+    x:EVO.map(p=>p[0]), y:EVO.map(p=>p[1]),
+    mode:'lines', type:'scatter',
+    line:{color:G, width:2},
+    fill:'tozeroy', fillcolor:'rgba(76,255,126,0.04)',
+    hovertemplate:'Día %{x}<br>%{y:.1f} kg<extra></extra>'
+  },
+  {
+    x:[optDay[0],optDay[0]], y:[0,optDay[1]],
+    mode:'lines', type:'scatter',
+    line:{color:'rgba(245,200,66,0.6)', width:1, dash:'dot'},
+    hoverinfo:'skip'
+  }
+],{
+  ...base, margin:{l:48,r:12,t:10,b:48},
+  xaxis:{...base.xaxis, title:{text:'Días', standoff:8}},
+  yaxis:{...base.yaxis, title:{text:'kg', standoff:8}},
+  annotations:[{
+    x:optDay[0], y:optDay[1],
+    text:`45 kg<br>día ${optDay[0]}`,
+    showarrow:true, arrowhead:2, arrowcolor:'rgba(245,200,66,0.7)',
+    font:{size:10, color:'#f5c842'}, bgcolor:'rgba(22,28,20,0.9)',
+    bordercolor:'rgba(245,200,66,0.4)', borderwidth:1
+  }]
+},cfg);
+
+// Conversión
+Plotly.newPlot('ch-conv',[{
+  x:LBL, y:RS.map(r=>r.c), type:'bar',
+  marker:{color:barC(RS.map(r=>r.c), false), line:{width:0}},
+  text:RS.map(r=>r.c.toFixed(2)), textposition:'outside', textfont:{size:10},
+  hovertemplate:'%{x}<br>%{y:.2f}<extra></extra>'
+}],{...base, yaxis:{...base.yaxis, range:[5,12]}, bargap:0.35},cfg);
+
+// GDP fases
+const fk = Object.keys(FASES), fv = Object.values(FASES);
+Plotly.newPlot('ch-gdp-fase',[{
+  x:fk, y:fv, type:'bar',
+  marker:{color:barC(fv), line:{width:0}},
+  text:fv.map(v=>(v*1000).toFixed(0)+' g'), textposition:'outside', textfont:{size:10},
+  hovertemplate:'%{x}<br>%{y:.4f} kg/día<extra></extra>'
+}],{...base, margin:Mh, xaxis:{...base.xaxis, tickangle:-8},
+  yaxis:{...base.yaxis, range:[0.18,0.36]}, bargap:0.3},cfg);
+
+// Costos vs valor
+Plotly.newPlot('ch-costo',[
+  {x:LBL, y:RS.map(r=>r.costo), type:'bar', name:'Costo',
+   marker:{color:'rgba(255,90,90,0.75)'}, text:RS.map(r=>'$'+fmt(r.costo)),
+   textposition:'inside', textfont:{color:'white',size:10},
+   hovertemplate:'%{x}<br>Costo: $%{y:,}<extra></extra>'},
+  {x:LBL, y:RS.map(r=>r.v), type:'bar', name:'Valor',
+   marker:{color:Gd}, text:RS.map(r=>'$'+fmt(r.v)),
+   textposition:'outside', textfont:{size:10},
+   hovertemplate:'%{x}<br>Valor: $%{y:,}<extra></extra>'}
+],{...base, barmode:'group', bargap:0.2, bargroupgap:0.08,
+  showlegend:true,
+  legend:{orientation:'h', y:1.06, font:{size:10}, bgcolor:'transparent',
+          font:{color:'#7a9470',size:10}},
+  yaxis:{...base.yaxis, tickprefix:'$'}},cfg);
+
+// GDP alimento
+const ak = Object.keys(ALIMENTO), av = Object.values(ALIMENTO);
+Plotly.newPlot('ch-alimento',[{
+  x:ak, y:av, type:'bar',
+  marker:{color:barC(av), line:{width:0}},
+  text:av.map(v=>(v*1000).toFixed(0)+' g'), textposition:'outside', textfont:{size:10},
+  hovertemplate:'%{x}<br>%{y:.4f} kg/día<extra></extra>'
+}],{...base, margin:Mh, xaxis:{...base.xaxis, tickangle:-10},
+  yaxis:{...base.yaxis, range:[0.22,0.36]}, bargap:0.3},cfg);
+
+// GDP raza
+const rk = Object.keys(RAZA), rv = Object.values(RAZA);
+Plotly.newPlot('ch-raza',[{
+  x:rk, y:rv, type:'bar',
+  marker:{color:barC(rv), line:{width:0}},
+  text:rv.map(v=>(v*1000).toFixed(0)+' g'), textposition:'outside', textfont:{size:10},
+  hovertemplate:'%{x}<br>%{y:.4f} kg/día<extra></extra>'
+}],{...base, yaxis:{...base.yaxis, range:[0.24,0.34]}, bargap:0.3},cfg);
+
+// Dist razas
+const xArr = Array.from({length:80},(_,i)=>17+i*0.25);
+const RC = [G,'#2adb5a','#5a9a78','#f5c842','rgba(76,255,126,0.4)'];
+Plotly.newPlot('ch-dist',
+  Object.entries(DIST).map(([n,{m,s}],i)=>({
+    x:xArr, y:xArr.map(x=>nPDF(x,m,s)),
+    mode:'lines', type:'scatter', name:n,
+    line:{width:1.5, color:RC[i]},
+    hovertemplate:`${n}: %{y:.4f}<extra></extra>`
+  })),
+  {...base, showlegend:true,
+   legend:{orientation:'h', y:-0.3, font:{size:9,color:'#7a9470'}, bgcolor:'transparent'},
+   margin:{...Mh, b:80},
+   xaxis:{...base.xaxis, title:{text:'Peso inicial (kg)', standoff:8}},
+   yaxis:{...base.yaxis, title:{text:'Densidad', standoff:8}}
+  },cfg);
+
+// ─────────────────────────────────────────────────
+// REVEAL ON SCROLL
+// ─────────────────────────────────────────────────
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); });
+}, { threshold:0.08 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+// NAV ACTIVE
+const secs = document.querySelectorAll('section[id]');
+const pills = document.querySelectorAll('.nav-pill');
+const io2 = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      pills.forEach(p=>p.classList.remove('on'));
+      const hit = document.querySelector(`.nav-pill[href="#${e.target.id}"]`);
+      if(hit) hit.classList.add('on');
+    }
+  });
+}, { rootMargin:'-35% 0px -60% 0px' });
+secs.forEach(s=>io2.observe(s));
+</script>
+</body>
+</html>
